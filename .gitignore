@@ -1,0 +1,12 @@
+.gocache/
+backend/.gocache/
+frontend/.git-backup/
+frontend/.vscode/
+frontend/.next/
+frontend/node_modules/
+frontend/out/
+frontend/build/
+*.tsbuildinfo
+*.log
+.env
+.env.*
