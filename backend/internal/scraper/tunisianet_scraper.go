@@ -13,8 +13,32 @@ import (
 
 var httpClient = &http.Client{Timeout: 15 * time.Second}
 
-func SearchTunisianet(search string) []models.Product {
+func firstAttr(selection *goquery.Selection, attrs ...string) string {
+	for _, attr := range attrs {
+		value, exists := selection.Attr(attr)
+		value = strings.TrimSpace(value)
 
+		if exists && value != "" && !strings.HasPrefix(value, "data:image") {
+			return normalizeURL(value)
+		}
+	}
+
+	return ""
+}
+
+func normalizeURL(value string) string {
+	if strings.HasPrefix(value, "//") {
+		return "https:" + value
+	}
+
+	if strings.HasPrefix(value, "/") {
+		return "https://www.tunisianet.com.tn" + value
+	}
+
+	return value
+}
+
+func SearchTunisianet(search string) []models.Product {
 	var products []models.Product
 
 	searchURL := "https://www.tunisianet.com.tn/recherche?controller=search&s=" + url.QueryEscape(search)
@@ -42,7 +66,14 @@ func SearchTunisianet(search string) []models.Product {
 
 		productURL, _ := s.Find(".product-title a").Attr("href")
 
-		imageURL, _ := s.Find(".product-thumbnail img").Attr("src")
+		image := s.Find(".product-thumbnail img").First()
+		imageURL := firstAttr(
+			image,
+			"data-full-size-image-url",
+			"data-src",
+			"data-original",
+			"src",
+		)
 
 		price := strings.TrimSpace(
 			s.Find(".price").First().Text(),
@@ -63,7 +94,6 @@ func SearchTunisianet(search string) []models.Product {
 }
 
 func GetProductDetails(productURL string) models.ProductDetails {
-
 	var product models.ProductDetails
 
 	resp, err := httpClient.Get(productURL)
@@ -89,7 +119,18 @@ func GetProductDetails(productURL string) models.ProductDetails {
 		doc.Find(".current-price span").First().Text(),
 	)
 
-	product.Image, _ = doc.Find("img.center-block.img-responsive").First().Attr("src")
+	productImage := doc.Find(".product-cover img").First()
+	if productImage.Length() == 0 {
+		productImage = doc.Find("img.center-block.img-responsive").First()
+	}
+
+	product.Image = firstAttr(
+		productImage,
+		"data-image-large-src",
+		"data-full-size-image-url",
+		"data-src",
+		"src",
+	)
 
 	product.Availability = strings.TrimSpace(
 		doc.Find(".in-stock").First().Text(),

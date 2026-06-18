@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"net/http"
+	"strings"
 
 	"tunisianet-scraper/internal/services"
 
@@ -10,7 +11,12 @@ import (
 
 func GetProducts(c echo.Context) error {
 
-	search := c.QueryParam("search")
+	search := strings.TrimSpace(c.QueryParam("search"))
+	if search == "" {
+		return c.JSON(http.StatusBadRequest, map[string]string{
+			"message": "Le paramètre search est obligatoire",
+		})
+	}
 
 	products := services.SearchProducts(search)
 
@@ -19,7 +25,12 @@ func GetProducts(c echo.Context) error {
 
 func GetProductDetails(c echo.Context) error {
 
-	url := c.QueryParam("url")
+	url := strings.TrimSpace(c.QueryParam("url"))
+	if url == "" {
+		return c.JSON(http.StatusBadRequest, map[string]string{
+			"message": "Le paramètre url est obligatoire",
+		})
+	}
 
 	product := services.GetProductDetails(url)
 
