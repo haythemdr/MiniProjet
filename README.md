@@ -114,4 +114,3 @@ npm run build
 
 **Haythem Dridi**
 
-Projet réalisé dans le cadre d'un mini-projet de stage.
