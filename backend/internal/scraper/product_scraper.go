@@ -9,6 +9,8 @@ import (
 	"tunisianet-scraper/internal/models"
 
 	"github.com/PuerkitoBio/goquery"
+
+    "strconv"
 )
 
 var httpClient = &http.Client{Timeout: 15 * time.Second}
@@ -39,47 +41,70 @@ func normalizeURL(value string) string {
 }
 
 func SearchTunisianet(search string) []models.Product {
+
 	var products []models.Product
+	seen := make(map[string]bool)
 
-	searchURL := "https://www.tunisianet.com.tn/recherche?controller=search&s=" + url.QueryEscape(search)
+	page := 1
 
-	resp, err := httpClient.Get(searchURL)
-	if err != nil {
-		return products
-	}
-	defer resp.Body.Close()
+	for {
 
-	if resp.StatusCode != http.StatusOK {
-		return products
-	}
+		searchURL := "https://www.tunisianet.com.tn/recherche?controller=search&s=" +
+			url.QueryEscape(search) +
+			"&submit_search=&page=" + strconv.Itoa(page) +
+			"&order=product.price.asc"
 
-	doc, err := goquery.NewDocumentFromReader(resp.Body)
-	if err != nil {
-		return products
-	}
+		resp, err := httpClient.Get(searchURL)
+		if err != nil {
+			break
+		}
 
-	doc.Find(".thumbnail-container").Each(func(i int, s *goquery.Selection) {
+		if resp.StatusCode != http.StatusOK {
+			resp.Body.Close()
+			break
+		}
 
-		name := strings.TrimSpace(
-			s.Find(".product-title a").Text(),
-		)
+		doc, err := goquery.NewDocumentFromReader(resp.Body)
+		resp.Body.Close()
 
-		productURL, _ := s.Find(".product-title a").Attr("href")
+		if err != nil {
+			break
+		}
 
-		image := s.Find(".product-thumbnail img").First()
-		imageURL := firstAttr(
-			image,
-			"data-full-size-image-url",
-			"data-src",
-			"data-original",
-			"src",
-		)
+		newProducts := 0
 
-		price := strings.TrimSpace(
-			s.Find(".price").First().Text(),
-		)
+		doc.Find(".thumbnail-container").Each(func(i int, s *goquery.Selection) {
 
-		if name != "" {
+			name := strings.TrimSpace(
+				s.Find(".product-title a").Text(),
+			)
+
+			if name == "" {
+				return
+			}
+
+			productURL, _ := s.Find(".product-title a").Attr("href")
+
+			if seen[productURL] {
+				return
+			}
+
+			seen[productURL] = true
+			newProducts++
+
+			image := s.Find(".product-thumbnail img").First()
+
+			imageURL := firstAttr(
+				image,
+				"data-full-size-image-url",
+				"data-src",
+				"data-original",
+				"src",
+			)
+
+			price := strings.TrimSpace(
+				s.Find(".price").First().Text(),
+			)
 
 			products = append(products, models.Product{
 				Name:  name,
@@ -87,12 +112,18 @@ func SearchTunisianet(search string) []models.Product {
 				Image: imageURL,
 				URL:   productURL,
 			})
+		})
+
+
+		if newProducts == 0 {
+			break
 		}
-	})
+
+		page++
+	}
 
 	return products
 }
-
 func GetProductDetails(productURL string) models.ProductDetails {
 	var product models.ProductDetails
 

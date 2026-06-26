@@ -44,6 +44,9 @@ const categories: Record<string, CategoryItem[]> = {
 export default function Home() {
   const [search, setSearch] = useState("");
   const [products, setProducts] = useState<Product[]>([]);
+  const [currentPage, setCurrentPage] = useState(1);
+
+  const PRODUCTS_PER_PAGE = 24;
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState(
     "Recherchez un produit ou choisissez une catégorie."
@@ -64,6 +67,7 @@ export default function Home() {
     try {
       const data = await searchProducts(value);
       setProducts(data);
+      setCurrentPage(1);
 
       if (data.length === 0) {
         setMessage("Aucun produit trouvé pour cette recherche.");
@@ -75,7 +79,15 @@ export default function Home() {
       setLoading(false);
     }
   };
+  const indexOfLastProduct = currentPage * PRODUCTS_PER_PAGE;
+  const indexOfFirstProduct = indexOfLastProduct - PRODUCTS_PER_PAGE;
 
+  const currentProducts = products.slice(
+    indexOfFirstProduct,
+    indexOfLastProduct
+  );
+
+  const totalPages = Math.ceil(products.length / PRODUCTS_PER_PAGE);
   return (
     <main className="min-h-screen bg-[#f5f7fb] text-zinc-900">
       <header className="border-b border-zinc-200 bg-white">
@@ -166,7 +178,7 @@ export default function Home() {
 
             {!loading && products.length > 0 && (
               <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-3">
-                {products.map((product) => (
+                {currentProducts.map((product) => (
                   <ProductCard
                     key={product.url || product.name}
                     product={product}
@@ -174,7 +186,40 @@ export default function Home() {
                 ))}
               </div>
             )}
+            {!loading && products.length > 0 && totalPages > 1 && (
+              <div className="mt-8 flex justify-center items-center gap-2">
+                <button
+                  disabled={currentPage === 1}
+                  onClick={() => setCurrentPage(currentPage - 1)}
+                  className="px-4 py-2 rounded bg-gray-200 disabled:opacity-50"
+                >
+                  Previous
+                </button>
+
+                {Array.from({ length: totalPages }, (_, i) => (
+                  <button
+                    key={i}
+                    onClick={() => setCurrentPage(i + 1)}
+                    className={`px-4 py-2 rounded ${currentPage === i + 1
+                        ? "bg-blue-700 text-white"
+                        : "bg-gray-200 hover:bg-gray-300"
+                      }`}
+                  >
+                    {i + 1}
+                  </button>
+                ))}
+
+                <button
+                  disabled={currentPage === totalPages}
+                  onClick={() => setCurrentPage(currentPage + 1)}
+                  className="px-4 py-2 rounded bg-gray-200 disabled:opacity-50"
+                >
+                  Next
+                </button>
+              </div>
+            )}
           </section>
+
         </div>
       </div>
     </main>
