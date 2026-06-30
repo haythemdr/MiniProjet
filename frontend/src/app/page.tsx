@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState,useEffect } from "react";
 import ProductCard from "@/components/ProductCard";
 import { searchProducts } from "@/services/api";
 import { Product } from "@/types/product";
@@ -42,6 +42,23 @@ const categories: Record<string, CategoryItem[]> = {
 };
 
 export default function Home() {
+  useEffect(() => {
+  const savedSearch = sessionStorage.getItem("search");
+  const savedProducts = sessionStorage.getItem("products");
+  const savedPage = sessionStorage.getItem("page");
+
+  if (savedSearch) {
+    setSearch(savedSearch);
+  }
+
+  if (savedProducts) {
+    setProducts(JSON.parse(savedProducts));
+  }
+
+  if (savedPage) {
+    setCurrentPage(Number(savedPage));
+  }
+}, []);
   const [search, setSearch] = useState("");
   const [products, setProducts] = useState<Product[]>([]);
   const [currentPage, setCurrentPage] = useState(1);
@@ -68,6 +85,9 @@ export default function Home() {
       const data = await searchProducts(value);
       setProducts(data);
       setCurrentPage(1);
+      sessionStorage.setItem("search", displayValue);
+      sessionStorage.setItem("products", JSON.stringify(data));
+      sessionStorage.setItem("page", "1");
 
       if (data.length === 0) {
         setMessage("Aucun produit trouvé pour cette recherche.");
@@ -79,6 +99,7 @@ export default function Home() {
       setLoading(false);
     }
   };
+  
   const indexOfLastProduct = currentPage * PRODUCTS_PER_PAGE;
   const indexOfFirstProduct = indexOfLastProduct - PRODUCTS_PER_PAGE;
 
@@ -88,6 +109,88 @@ export default function Home() {
   );
 
   const totalPages = Math.ceil(products.length / PRODUCTS_PER_PAGE);
+  const changePage = (page: number) => {
+    setCurrentPage(page);
+    sessionStorage.setItem("page", page.toString());
+    window.scrollTo({
+      top: 0,
+      behavior: "smooth",
+    });
+  };
+
+  const getVisiblePages = () => {
+    const pages: (number | string)[] = [];
+
+    if (totalPages <= 7) {
+      return Array.from({ length: totalPages }, (_, i) => i + 1);
+    }
+
+    const start = Math.max(2, currentPage - 1);
+    const end = Math.min(totalPages - 1, currentPage + 1);
+
+    pages.push(1);
+
+    if (start > 2) {
+      pages.push("...");
+    }
+
+    for (let i = start; i <= end; i++) {
+      pages.push(i);
+    }
+
+    if (end < totalPages - 1) {
+      pages.push("...");
+    }
+
+    pages.push(totalPages);
+
+    return pages;
+  };
+  const Pagination = () => {
+    if (totalPages <= 1) return null;
+
+    return (
+      <div className="flex flex-wrap items-center justify-center gap-2 py-6">
+
+        <button
+          disabled={currentPage === 1}
+          onClick={() => changePage(currentPage - 1)}
+          className="rounded-lg border px-4 py-2 disabled:opacity-40 hover:bg-zinc-100"
+        >
+          ← Previous
+        </button>
+
+        {getVisiblePages().map((page, index) =>
+          page === "..." ? (
+            <span key={index} className="px-2">
+              ...
+            </span>
+          ) : (
+            <button
+              key={`${page}-${index}`}
+              onClick={() => changePage(page as number)}
+              className={`h-10 w-10 rounded-lg border transition ${currentPage === page
+                ? "bg-blue-700 text-white border-blue-700"
+                : "hover:bg-zinc-100"
+                }`}
+            >
+              {page}
+            </button>
+          )
+        )}
+
+        <button
+          disabled={currentPage === totalPages}
+          onClick={() => changePage(currentPage + 1)}
+          className="rounded-lg border px-4 py-2 disabled:opacity-40 hover:bg-zinc-100"
+        >
+          Next →
+        </button>
+
+      </div>
+    );
+  };
+  console.log(getVisiblePages());
   return (
     <main className="min-h-screen bg-[#f5f7fb] text-zinc-900">
       <header className="border-b border-zinc-200 bg-white">
@@ -158,9 +261,15 @@ export default function Home() {
             <div className="mb-4 flex min-h-8 items-center justify-between">
               <h2 className="text-xl font-bold">Produits</h2>
               {!loading && products.length > 0 && (
-                <p className="text-sm font-medium text-zinc-600">
-                  {products.length} produits trouvés
-                </p>
+                <div className="text-right">
+                  <p className="text-sm font-medium text-zinc-600">
+                    {products.length} produits trouvés
+                  </p>
+
+                  <p className="text-xs text-zinc-500">
+                    Page {currentPage} sur {totalPages}
+                  </p>
+                </div>
               )}
             </div>
 
@@ -177,48 +286,21 @@ export default function Home() {
             )}
 
             {!loading && products.length > 0 && (
-              <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-3">
-                {currentProducts.map((product) => (
-                  <ProductCard
-                    key={product.url || product.name}
-                    product={product}
-                  />
-                ))}
-              </div>
+              <>
+                <Pagination />
+                <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-3">
+                  {currentProducts.map((product) => (
+                    <ProductCard
+                      key={product.url || product.name}
+                      product={product}
+                    />
+                  ))}
+                </div>
+                <Pagination />
+              </>
             )}
-            
-            {!loading && products.length > 0 && totalPages > 1 && (
-              <div className="mt-8 flex justify-center items-center gap-2">
-                <button
-                  disabled={currentPage === 1}
-                  onClick={() => setCurrentPage(currentPage - 1)}
-                  className="px-4 py-2 rounded bg-gray-200 disabled:opacity-50"
-                >
-                  Previous
-                </button>
 
-                {Array.from({ length: totalPages }, (_, i) => (
-                  <button
-                    key={i}
-                    onClick={() => setCurrentPage(i + 1)}
-                    className={`px-4 py-2 rounded ${currentPage === i + 1
-                        ? "bg-blue-700 text-white"
-                        : "bg-gray-200 hover:bg-gray-300"
-                      }`}
-                  >
-                    {i + 1}
-                  </button>
-                ))}
 
-                <button
-                  disabled={currentPage === totalPages}
-                  onClick={() => setCurrentPage(currentPage + 1)}
-                  className="px-4 py-2 rounded bg-gray-200 disabled:opacity-50"
-                >
-                  Next
-                </button>
-              </div>
-            )}
           </section>
 
         </div>
