@@ -1,8 +1,9 @@
 package models
 
 type Product struct {
-	Name  string `json:"name"`
-	Price string `json:"price"`
-	Image string `json:"image"`
-	URL   string `json:"url"`
+    Name  string `json:"name"`
+    Price string `json:"price"`
+    Image string `json:"image"`
+    URL   string `json:"url"`
+    Store string `json:"store"`
 }

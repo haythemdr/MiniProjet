@@ -6,7 +6,14 @@ import (
 )
 
 func SearchProducts(search string) []models.Product {
-	return scraper.SearchTunisianet(search)
+
+	tunisianetProducts := scraper.SearchTunisianet(search)
+
+	mytekProducts := scraper.SearchMyTek(search)
+
+	products := append(tunisianetProducts, mytekProducts...)
+
+	return products
 }
 
 func GetProductDetails(url string) models.ProductDetails {

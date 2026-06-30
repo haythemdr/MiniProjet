@@ -186,6 +186,7 @@ export default function Home() {
                 ))}
               </div>
             )}
+            
             {!loading && products.length > 0 && totalPages > 1 && (
               <div className="mt-8 flex justify-center items-center gap-2">
                 <button

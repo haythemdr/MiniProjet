@@ -1,6 +1,7 @@
 package scraper
 
 import (
+	"html"
 	"net/http"
 	"net/url"
 	"strings"
@@ -10,7 +11,7 @@ import (
 
 	"github.com/PuerkitoBio/goquery"
 
-    "strconv"
+	"strconv"
 )
 
 var httpClient = &http.Client{Timeout: 15 * time.Second}
@@ -40,6 +41,53 @@ func normalizeURL(value string) string {
 	return value
 }
 
+func firstMetaContent(doc *goquery.Document, selector string) string {
+	value, _ := doc.Find(selector).First().Attr("content")
+	return strings.TrimSpace(html.UnescapeString(value))
+}
+
+func normalizeSearchText(value string) string {
+	value = strings.ToLower(value)
+	replacer := strings.NewReplacer(
+		"à", "a", "â", "a", "ä", "a",
+		"ç", "c",
+		"é", "e", "è", "e", "ê", "e", "ë", "e",
+		"î", "i", "ï", "i",
+		"ô", "o", "ö", "o",
+		"ù", "u", "û", "u", "ü", "u",
+		"-", " ", "_", " ", "/", " ", "\\", " ", ".", " ", ",", " ", ":", " ", ";", " ", "'", " ", "\"", " ", "(", " ", ")", " ", "[", " ", "]", " ", "+", " ", "&", " ",
+	)
+	return strings.Join(strings.Fields(replacer.Replace(value)), " ")
+}
+
+func productMatchesSearch(search string, values ...string) bool {
+	search = normalizeSearchText(search)
+	if search == "" {
+		return true
+	}
+
+	combined := normalizeSearchText(strings.Join(values, " "))
+	if combined == "" {
+		return false
+	}
+
+	matchedToken := false
+	for _, token := range strings.Fields(search) {
+		if len(token) > 3 && strings.HasSuffix(token, "s") {
+			token = strings.TrimSuffix(token, "s")
+		}
+		if len(token) < 2 {
+			continue
+		}
+
+		matchedToken = true
+		if !strings.Contains(combined, token) {
+			return false
+		}
+	}
+
+	return matchedToken
+}
 func SearchTunisianet(search string) []models.Product {
 
 	var products []models.Product
@@ -65,6 +113,7 @@ func SearchTunisianet(search string) []models.Product {
 		}
 
 		doc, err := goquery.NewDocumentFromReader(resp.Body)
+
 		resp.Body.Close()
 
 		if err != nil {
@@ -111,9 +160,9 @@ func SearchTunisianet(search string) []models.Product {
 				Price: price,
 				Image: imageURL,
 				URL:   productURL,
+				Store: "TunisiaNet",
 			})
 		})
-
 
 		if newProducts == 0 {
 			break
@@ -124,10 +173,21 @@ func SearchTunisianet(search string) []models.Product {
 
 	return products
 }
+
 func GetProductDetails(productURL string) models.ProductDetails {
 	var product models.ProductDetails
 
-	resp, err := httpClient.Get(productURL)
+	req, err := http.NewRequest("GET", productURL, nil)
+	if err != nil {
+		return product
+	}
+
+	req.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/138.0.0.0 Safari/537.36")
+	req.Header.Set("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8")
+	req.Header.Set("Accept-Language", "fr-FR,fr;q=0.9,en;q=0.8")
+	req.Header.Set("Cache-Control", "no-cache")
+
+	resp, err := httpClient.Do(req)
 	if err != nil {
 		return product
 	}
@@ -140,6 +200,10 @@ func GetProductDetails(productURL string) models.ProductDetails {
 	doc, err := goquery.NewDocumentFromReader(resp.Body)
 	if err != nil {
 		return product
+	}
+
+	if strings.Contains(productURL, "mytek.tn") {
+		return getMyTekProductDetails(doc)
 	}
 
 	product.Name = strings.TrimSpace(
@@ -170,6 +234,46 @@ func GetProductDetails(productURL string) models.ProductDetails {
 	product.Description = strings.TrimSpace(
 		doc.Find(".prodes").First().Text(),
 	)
+
+	return product
+}
+
+func getMyTekProductDetails(doc *goquery.Document) models.ProductDetails {
+	var product models.ProductDetails
+
+	product.Name = strings.TrimSpace(doc.Find(".page-title .base").First().Text())
+	if product.Name == "" {
+		product.Name = firstMetaContent(doc, "meta[property='og:title']")
+	}
+
+	product.Price = firstMetaContent(doc, "meta[itemprop='price']")
+	if product.Price == "" {
+		product.Price = strings.TrimSpace(doc.Find("[data-price-type='finalPrice']").First().AttrOr("data-price-amount", ""))
+	}
+	if product.Price != "" {
+		product.Price += " TND"
+	}
+
+	product.Image = firstMetaContent(doc, "meta[property='og:image']")
+	if product.Image == "" {
+		product.Image = normalizeMyTekImageURL(doc.Find(".gallery-placeholder img, .fotorama__img").First().AttrOr("src", ""))
+	}
+
+	product.Availability = strings.TrimSpace(doc.Find(".stock.available span, .stock-status-placeholder span").First().Text())
+	if product.Availability == "" {
+		availability, _ := doc.Find("link[itemprop='availability']").First().Attr("href")
+		if strings.Contains(strings.ToLower(availability), "instock") {
+			product.Availability = "En stock"
+		}
+	}
+
+	product.Description = strings.TrimSpace(doc.Find(".product.attribute.overview [itemprop='description']").First().Text())
+	if product.Description == "" {
+		product.Description = strings.TrimSpace(doc.Find(".product.attribute.description .value").First().Text())
+	}
+	if product.Description == "" {
+		product.Description = firstMetaContent(doc, "meta[property='og:description']")
+	}
 
 	return product
 }

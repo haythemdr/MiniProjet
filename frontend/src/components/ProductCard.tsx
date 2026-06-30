@@ -32,6 +32,16 @@ export default function ProductCard({ product }: Props) {
         <h3 className="line-clamp-2 text-base font-semibold leading-6 text-zinc-900">
           {product.name}
         </h3>
+        <div className="mt-2">
+          <span
+            className={`rounded-full px-3 py-1 text-xs font-semibold ${product.store === "TunisiaNet"
+                ? "bg-red-100 text-red-700"
+                : "bg-blue-100 text-blue-700"
+              }`}
+          >
+            {product.store}
+          </span>
+        </div>
 
         <p className="mt-3 text-xl font-bold text-blue-700">
           {product.price || "Prix indisponible"}
