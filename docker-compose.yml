@@ -1,8 +1,25 @@
 services:
+  postgres:
+    image: postgres:16
+    container_name: product-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: product_search
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
   backend:
     build: ./backend
     ports:
       - "8080:8080"
+    depends_on:
+      - postgres
+    environment:
+      DATABASE_URL: postgres://postgres:postgres@postgres:5432/product_search
 
   frontend:
     build: ./frontend
@@ -12,3 +29,6 @@ services:
       - backend
     environment:
       - NEXT_PUBLIC_API_URL=http://localhost:8080
+
+volumes:
+  postgres_data:
