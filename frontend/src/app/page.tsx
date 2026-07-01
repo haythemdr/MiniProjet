@@ -10,6 +10,9 @@ type CategoryItem = {
   query: string;
 };
 
+
+const SESSION_CACHE_VERSION = "2";
+
 const categories: Record<string, CategoryItem[]> = {
   Informatique: [
     { label: "Composants", query: "composant pc" },
@@ -43,22 +46,31 @@ const categories: Record<string, CategoryItem[]> = {
 
 export default function Home() {
   useEffect(() => {
-  const savedSearch = sessionStorage.getItem("search");
-  const savedProducts = sessionStorage.getItem("products");
-  const savedPage = sessionStorage.getItem("page");
+    const savedVersion = sessionStorage.getItem("productsCacheVersion");
+    if (savedVersion !== SESSION_CACHE_VERSION) {
+      sessionStorage.removeItem("search");
+      sessionStorage.removeItem("products");
+      sessionStorage.removeItem("page");
+      sessionStorage.setItem("productsCacheVersion", SESSION_CACHE_VERSION);
+      return;
+    }
 
-  if (savedSearch) {
-    setSearch(savedSearch);
-  }
+    const savedSearch = sessionStorage.getItem("search");
+    const savedProducts = sessionStorage.getItem("products");
+    const savedPage = sessionStorage.getItem("page");
 
-  if (savedProducts) {
-    setProducts(JSON.parse(savedProducts));
-  }
+    if (savedSearch) {
+      setSearch(savedSearch);
+    }
 
-  if (savedPage) {
-    setCurrentPage(Number(savedPage));
-  }
-}, []);
+    if (savedProducts) {
+      setProducts(JSON.parse(savedProducts));
+    }
+
+    if (savedPage) {
+      setCurrentPage(Number(savedPage));
+    }
+  }, []);
   const [search, setSearch] = useState("");
   const [products, setProducts] = useState<Product[]>([]);
   const [currentPage, setCurrentPage] = useState(1);
@@ -85,6 +97,7 @@ export default function Home() {
       const data = await searchProducts(value);
       setProducts(data);
       setCurrentPage(1);
+      sessionStorage.setItem("productsCacheVersion", SESSION_CACHE_VERSION);
       sessionStorage.setItem("search", displayValue);
       sessionStorage.setItem("products", JSON.stringify(data));
       sessionStorage.setItem("page", "1");

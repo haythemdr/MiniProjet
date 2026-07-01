@@ -3,16 +3,21 @@
 import Image from "next/image";
 import Link from "next/link";
 import { Product } from "@/types/product";
+import { useState } from "react";
+
 
 interface Props {
   product: Product;
 }
 
 export default function ProductCard({ product }: Props) {
+  const [imageFailed, setImageFailed] = useState(false);
+  const showImage = product.image && !imageFailed;
+
   return (
     <article className="group overflow-hidden rounded-lg border border-zinc-200 bg-white shadow-sm transition hover:-translate-y-0.5 hover:shadow-md">
       <div className="relative h-52 w-full border-b border-zinc-100 bg-zinc-50">
-        {product.image ? (
+        {showImage ? (
           <Image
             src={product.image}
             alt={product.name}
@@ -20,6 +25,7 @@ export default function ProductCard({ product }: Props) {
             unoptimized
             sizes="(min-width: 1280px) 30vw, (min-width: 768px) 50vw, 100vw"
             className="object-contain p-4"
+            onError={() => setImageFailed(true)}
           />
         ) : (
           <div className="flex h-full items-center justify-center text-sm text-zinc-400">

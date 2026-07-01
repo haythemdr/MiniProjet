@@ -12,6 +12,7 @@ func SearchProducts(search string) []models.Product {
 	products = append(products, scraper.SearchTunisianet(search)...)
 	products = append(products, scraper.SearchMyTek(search)...)
 	products = append(products, scraper.SearchWiki(search)...)
+	products = append(products, scraper.SearchSpaceNet(search)...)
 
 	return products
 }

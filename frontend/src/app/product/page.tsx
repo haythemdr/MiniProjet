@@ -11,6 +11,7 @@ function ProductDetailsContent() {
   const url = searchParams.get("url");
   const [product, setProduct] = useState<ProductDetails | null>(null);
   const [error, setError] = useState("");
+  const [imageFailed, setImageFailed] = useState(false);
 
   useEffect(() => {
     if (!url) {
@@ -20,6 +21,7 @@ function ProductDetailsContent() {
     const loadProduct = async () => {
       try {
         const data = await getProductDetails(url);
+        setImageFailed(false);
         setProduct(data);
       } catch {
         setError("Impossible de charger les détails du produit.");
@@ -76,7 +78,7 @@ function ProductDetailsContent() {
         <section className="grid gap-8 rounded-lg border border-zinc-200 bg-white p-6 shadow-sm lg:grid-cols-[minmax(0,1fr)_400px] lg:p-8">
           <div className="flex min-h-[420px] items-center justify-center rounded-lg border border-zinc-200 bg-zinc-50 p-6">
             <div className="relative h-80 w-full max-w-xl sm:h-96">
-              {product.image ? (
+              {product.image && !imageFailed ? (
                 <Image
                   src={product.image}
                   alt={product.name}
@@ -85,6 +87,7 @@ function ProductDetailsContent() {
                   unoptimized
                   sizes="(min-width: 1024px) 55vw, 100vw"
                   className="object-contain"
+                  onError={() => setImageFailed(true)}
                 />
               ) : (
                 <div className="flex h-full items-center justify-center text-zinc-400">

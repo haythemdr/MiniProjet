@@ -11,6 +11,10 @@ const nextConfig: NextConfig = {
         protocol: "https",
         hostname: "tunisianet.com.tn",
       },
+      {
+        protocol: "https",
+        hostname: "wiki.tn",
+      },
     ],
   },
 };

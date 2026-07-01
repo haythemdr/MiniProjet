@@ -11,7 +11,7 @@ import (
 	"github.com/PuerkitoBio/goquery"
 )
 
-func SearchWiki(search string) []models.Product {
+func SearchSpaceNet(search string) []models.Product {
 
 	var products []models.Product
 	seen := make(map[string]bool)
@@ -20,10 +20,14 @@ func SearchWiki(search string) []models.Product {
 
 	for {
 
-		searchURL := "https://wiki.tn/?s=" +
-			url.QueryEscape(search) +
-			"&post_type=product&dgwt_wcas=1" +
-			"&paged=" + strconv.Itoa(page)
+		searchURL := "https://spacenet.tn/module/ambjolisearch/jolisearch?orderby=position&orderway=desc&search_query=" +
+			url.QueryEscape(search)
+
+		if page > 1 {
+			searchURL += "&page=" + strconv.Itoa(page)
+		}
+
+		println("URL:", searchURL)
 
 		req, err := http.NewRequest("GET", searchURL, nil)
 		if err != nil {
@@ -33,60 +37,56 @@ func SearchWiki(search string) []models.Product {
 		req.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/138.0.0.0 Safari/537.36")
 		req.Header.Set("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8")
 		req.Header.Set("Accept-Language", "fr-FR,fr;q=0.9,en;q=0.8")
-		req.Header.Set("Referer", "https://wiki.tn/")
+		req.Header.Set("Referer", "https://spacenet.tn/")
 		req.Header.Set("Cache-Control", "no-cache")
 
 		resp, err := httpClient.Do(req)
 		if err != nil {
+			println("HTTP ERROR:", err.Error())
 			break
 		}
 
+		println("Status:", resp.StatusCode)
 		if resp.StatusCode != http.StatusOK {
 			resp.Body.Close()
 			break
 		}
 
 		doc, err := goquery.NewDocumentFromReader(resp.Body)
+		if err != nil {
+			println("GOQUERY ERROR:", err.Error())
+			break
+		}
+
+		println("Document loaded")
 		resp.Body.Close()
 
 		if err != nil {
 			break
 		}
+		println("Status:", resp.StatusCode)
+		println("Document loaded")
 
 		newProducts := 0
+		count := doc.Find(".product-miniature").Length()
+		println("Page:", page, "Products found:", count)
 
-		doc.Find(".product-card--grid").Each(func(i int, s *goquery.Selection) {
+		doc.Find(".product-miniature").Each(func(i int, s *goquery.Selection) {
 
 			name := strings.TrimSpace(
-				s.Find(".product-card__title a").Text(),
+				s.Find(".product_name a").Text(),
 			)
 
-			productURL, _ := s.Find(".product-card__title a").Attr("href")
+			productURL, _ := s.Find(".product_name a").Attr("href")
 			productURL = strings.TrimSpace(productURL)
 
-			img := s.Find(".product-card__image img")
+			imageURL, _ := s.Find(".cover_image img").Attr("src")
+			imageURL = strings.TrimSpace(imageURL)
 
-			imageURL := firstImageURL(
-				img,
-				searchURL,
-				"data-large_image",
-				"data-large-image",
-				"data-o_src",
-				"data-lazy-src",
-				"data-src",
-				"src",
+			price := strings.TrimSpace(
+				s.Find(".price").First().Text(),
 			)
 
-			imageURL = normalizeURLForHost(imageURL, searchURL)
-
-			priceSelection := s.Find(".price ins .woocommerce-Price-amount bdi").First()
-			if priceSelection.Length() == 0 {
-				priceSelection = s.Find(".woocommerce-Price-amount bdi").First()
-			}
-
-			price := strings.TrimSpace(priceSelection.Text())
-
-			// Ignore invalid or duplicate products
 			if name == "" || productURL == "" || seen[productURL] {
 				return
 			}
@@ -99,7 +99,7 @@ func SearchWiki(search string) []models.Product {
 				Price: price,
 				Image: imageURL,
 				URL:   productURL,
-				Store: "Wiki",
+				Store: "SpaceNet",
 			})
 		})
 
