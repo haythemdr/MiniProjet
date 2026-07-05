@@ -2,6 +2,7 @@ package main
 
 import (
 	"tunisianet-scraper/internal/routes"
+	"tunisianet-scraper/internal/services"
 
 	"os"
 
@@ -12,11 +13,18 @@ import (
 )
 
 func main() {
+
 	database.Connect(os.Getenv("DATABASE_URL"))
+
 	if err := database.CreateTables(); err != nil {
 		panic(err)
 	}
+
+	// Start background cache refresher
+	services.StartCacheWarmer()
+
 	e := echo.New()
+
 	e.Use(middleware.CORS())
 
 	routes.RegisterRoutes(e)

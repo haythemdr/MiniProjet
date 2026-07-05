@@ -63,6 +63,19 @@ func CreateTables() error {
 	if err != nil {
 		return err
 	}
+	// Search statistics table
+	_, err = DB.Exec(context.Background(), `
+CREATE TABLE IF NOT EXISTS search_queries (
+	id SERIAL PRIMARY KEY,
+	query TEXT UNIQUE NOT NULL,
+	search_count INT DEFAULT 0,
+	last_search TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+	last_refresh TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+`)
+	if err != nil {
+		return err
+	}
 
 	return nil
 }

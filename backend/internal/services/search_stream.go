@@ -41,9 +41,9 @@ func SearchProductsStream(
 	out chan<- []models.Product,
 ) {
 
+	_ = repository.RecordSearch(search)
+
 	var wg sync.WaitGroup
-	//seen := make(map[string]bool)
-	//var mu sync.Mutex
 
 	wg.Add(3)
 
