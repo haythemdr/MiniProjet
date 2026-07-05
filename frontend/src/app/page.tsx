@@ -1,14 +1,14 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import ProductCard from "@/components/ProductCard";
-import { searchProducts } from "@/services/api";
+import { searchProducts, streamProducts, } from "@/services/api";
 import { Product } from "@/types/product";
-import { 
-  Search, 
-  Monitor, 
-  Smartphone, 
-  Heart, 
+import {
+  Search,
+  Monitor,
+  Smartphone,
+  Heart,
   Home,
   ChevronRight,
   Sparkles,
@@ -70,6 +70,8 @@ export default function Homes() {
   const [products, setProducts] = useState<Product[]>([]);
   const [currentPage, setCurrentPage] = useState(1);
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
+  const eventSourceRef = useRef<EventSource | null>(null);
+
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState(
     "Recherchez un produit ou choisissez une catégorie."
@@ -103,6 +105,14 @@ export default function Homes() {
       setCurrentPage(Number(savedPage));
     }
   }, []);
+  useEffect(() => {
+  return () => {
+    if (eventSourceRef.current) {
+      eventSourceRef.current.close();
+      eventSourceRef.current = null;
+    }
+  };
+}, []);
 
   const loadProducts = async (query: string, displayValue = query) => {
     const value = query.trim();
@@ -117,24 +127,58 @@ export default function Homes() {
     setMessage("");
     setActiveCategory(displayValue);
 
-    try {
-      const data = await searchProducts(value);
-      setProducts(data);
-      setCurrentPage(1);
-      sessionStorage.setItem("productsCacheVersion", SESSION_CACHE_VERSION);
-      sessionStorage.setItem("search", displayValue);
-      sessionStorage.setItem("products", JSON.stringify(data));
-      sessionStorage.setItem("page", "1");
+    // Reset previous results
+    setProducts([]);
+    setCurrentPage(1);
 
-      if (data.length === 0) {
-        setMessage("Aucun produit trouvé pour cette recherche.");
-      }
-    } catch {
-      setProducts([]);
-      setMessage("Impossible de charger les produits pour le moment.");
-    } finally {
-      setLoading(false);
+    let firstBatch = true;
+    if (eventSourceRef.current) {
+      eventSourceRef.current.close();
     }
+
+    eventSourceRef.current = streamProducts(
+      value,
+
+      // Called every time a scraper sends a page
+      (newProducts) => {
+        if (firstBatch) {
+          setLoading(false);
+          firstBatch = false;
+        }
+
+        setProducts((old) => {
+          const updated = [...old, ...newProducts];
+
+          sessionStorage.setItem(
+            "productsCacheVersion",
+            SESSION_CACHE_VERSION
+          );
+          sessionStorage.setItem("search", displayValue);
+          sessionStorage.setItem("products", JSON.stringify(updated));
+          sessionStorage.setItem("page", "1");
+
+          return updated;
+        });
+      },
+
+      // Finished
+      () => {
+        eventSourceRef.current = null;
+        setLoading(false);
+      },
+
+      // Error
+      () => {
+        if (eventSourceRef.current) {
+          eventSourceRef.current.close();
+          eventSourceRef.current = null;
+        }
+
+        setLoading(false);
+        setProducts([]);
+        setMessage("Impossible de charger les produits.");
+      }
+    );
   };
 
   const indexOfLastProduct = currentPage * PRODUCTS_PER_PAGE;
@@ -143,7 +187,7 @@ export default function Homes() {
   const currentProducts = products.slice(indexOfFirstProduct, indexOfLastProduct);
 
   const totalPages = Math.ceil(products.length / PRODUCTS_PER_PAGE);
-  
+
   const changePage = (page: number) => {
     setCurrentPage(page);
     sessionStorage.setItem("page", page.toString());
@@ -205,11 +249,10 @@ export default function Homes() {
             <button
               key={`${page}-${index}`}
               onClick={() => changePage(page as number)}
-              className={`min-w-[2.5rem] h-10 rounded-xl text-sm font-semibold transition-all duration-200 ${
-                currentPage === page
-                  ? "bg-gradient-to-br from-violet-600 to-indigo-600 text-white shadow-lg shadow-indigo-500/25 scale-105"
-                  : "border border-zinc-200 bg-white text-zinc-700 hover:border-zinc-300 hover:bg-zinc-50 hover:shadow-md"
-              }`}
+              className={`min-w-[2.5rem] h-10 rounded-xl text-sm font-semibold transition-all duration-200 ${currentPage === page
+                ? "bg-gradient-to-br from-violet-600 to-indigo-600 text-white shadow-lg shadow-indigo-500/25 scale-105"
+                : "border border-zinc-200 bg-white text-zinc-700 hover:border-zinc-300 hover:bg-zinc-50 hover:shadow-md"
+                }`}
             >
               {page}
             </button>
@@ -259,7 +302,7 @@ export default function Homes() {
                 Explorez des milliers de produits aux prix imbattables. Votre prochain achat commence ici.
               </p>
             </div>
-            
+
             <div className="hidden lg:flex items-center gap-3">
               <div className="flex items-center gap-2 rounded-xl border border-green-200 bg-green-50 px-4 py-2.5">
                 <TrendingUp className="w-4 h-4 text-green-600" />
@@ -304,9 +347,9 @@ export default function Homes() {
                 <ArrowRight className="w-4 h-4 transition-transform group-hover:translate-x-0.5" />
               </button>
             </div>
-            
+
             {/* Quick stats when products are loaded */}
-            {!loading && products.length > 0 && (
+            {products.length > 0 && (
               <div className="mt-4 flex flex-wrap gap-3 text-xs font-medium text-zinc-600">
                 <div className="flex items-center gap-1.5">
                   <div className="w-1.5 h-1.5 rounded-full bg-green-500"></div>
@@ -351,18 +394,16 @@ export default function Homes() {
                           onClick={() =>
                             loadProducts(subCategory.query, subCategory.label)
                           }
-                          className={`group flex items-center justify-between rounded-xl px-3 py-2.5 text-sm font-medium transition-all ${
-                            activeCategory === subCategory.label
-                              ? "bg-gradient-to-r from-violet-50 to-indigo-50 text-violet-700 border border-violet-200"
-                              : "text-zinc-600 hover:bg-zinc-50 hover:text-zinc-900"
-                          }`}
+                          className={`group flex items-center justify-between rounded-xl px-3 py-2.5 text-sm font-medium transition-all ${activeCategory === subCategory.label
+                            ? "bg-gradient-to-r from-violet-50 to-indigo-50 text-violet-700 border border-violet-200"
+                            : "text-zinc-600 hover:bg-zinc-50 hover:text-zinc-900"
+                            }`}
                         >
                           <span>{subCategory.label}</span>
-                          <ChevronRight className={`w-4 h-4 transition-all ${
-                            activeCategory === subCategory.label
-                              ? "opacity-100 translate-x-0"
-                              : "opacity-0 -translate-x-2 group-hover:opacity-100 group-hover:translate-x-0"
-                          }`} />
+                          <ChevronRight className={`w-4 h-4 transition-all ${activeCategory === subCategory.label
+                            ? "opacity-100 translate-x-0"
+                            : "opacity-0 -translate-x-2 group-hover:opacity-100 group-hover:translate-x-0"
+                            }`} />
                         </button>
                       ))}
                     </div>
@@ -386,7 +427,7 @@ export default function Homes() {
                   </span>
                 )}
               </div>
-              {!loading && products.length > 0 && (
+              {products.length > 0 && (
                 <div className="hidden sm:flex items-center gap-2 text-sm text-zinc-500">
                   <span>Page</span>
                   <span className="font-semibold text-zinc-900">{currentPage}</span>
@@ -396,8 +437,8 @@ export default function Homes() {
               )}
             </div>
 
-            {/* Loading State */}
-            {loading && (
+            {/* Loading State (only before the first batch of products has arrived) */}
+            {loading && products.length === 0 && (
               <div className="space-y-4">
                 <div className="rounded-2xl border border-zinc-200 bg-white p-12 text-center shadow-sm">
                   <div className="flex flex-col items-center gap-4">
@@ -421,6 +462,14 @@ export default function Homes() {
                     </div>
                   ))}
                 </div>
+              </div>
+            )}
+
+            {/* Streaming indicator: more products are still arriving in the background */}
+            {loading && products.length > 0 && (
+              <div className="mb-4 flex items-center gap-2 rounded-xl border border-violet-100 bg-violet-50 px-4 py-2.5 text-sm font-medium text-violet-700">
+                <div className="w-4 h-4 rounded-full border-2 border-violet-200 border-t-violet-600 animate-spin"></div>
+                Chargement de produits supplémentaires...
               </div>
             )}
 
@@ -452,7 +501,7 @@ export default function Homes() {
             )}
 
             {/* Products Grid */}
-            {!loading && products.length > 0 && (
+            {products.length > 0 && (
               <>
                 <Pagination />
                 <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-3">

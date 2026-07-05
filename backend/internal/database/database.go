@@ -25,18 +25,44 @@ func Connect(databaseURL string) {
 	log.Println("✅ Connected to PostgreSQL")
 }
 func CreateTables() error {
+
+	// Products table
 	_, err := DB.Exec(context.Background(), `
 	CREATE TABLE IF NOT EXISTS products (
 		id SERIAL PRIMARY KEY,
-        query TEXT NOT NULL,
-        name TEXT NOT NULL,
-        price TEXT,
-        image TEXT,
-        url TEXT UNIQUE,
-        store TEXT,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+		name TEXT NOT NULL,
+		price TEXT,
+		image TEXT,
+		url TEXT UNIQUE,
+		store TEXT,
+		last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 	);
 	`)
+	if err != nil {
+		return err
+	}
 
-	return err
+	// Search cache table
+	_, err = DB.Exec(context.Background(), `
+	CREATE TABLE IF NOT EXISTS search_cache (
+		id SERIAL PRIMARY KEY,
+		query TEXT NOT NULL,
+		store TEXT NOT NULL,
+		product_url TEXT NOT NULL,
+		created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+
+		CONSTRAINT fk_product
+			FOREIGN KEY (product_url)
+			REFERENCES products(url)
+			ON DELETE CASCADE,
+
+		CONSTRAINT unique_search
+			UNIQUE(query, store, product_url)
+	);
+	`)
+	if err != nil {
+		return err
+	}
+
+	return nil
 }

@@ -154,90 +154,79 @@ func productMatchesSearch(search string, values ...string) bool {
 
 	return matchedToken
 }
-func SearchTunisianet(search string) []models.Product {
+func SearchTunisianetPage(search string, page int) ([]models.Product, bool) {
 
 	var products []models.Product
 	seen := make(map[string]bool)
 
-	page := 1
+	searchURL := "https://www.tunisianet.com.tnnn/recherche?controller=search&s=" +
+		url.QueryEscape(search) +
+		"&submit_search=&page=" + strconv.Itoa(page) +
+		"&order=product.price.asc"
 
-	for {
+	resp, err := httpClient.Get(searchURL)
+	if err != nil {
+		return nil, false
+	}
+	defer resp.Body.Close()
 
-		searchURL := "https://www.tunisianet.com.tn/recherche?controller=search&s=" +
-			url.QueryEscape(search) +
-			"&submit_search=&page=" + strconv.Itoa(page) +
-			"&order=product.price.asc"
-
-		resp, err := httpClient.Get(searchURL)
-		if err != nil {
-			break
-		}
-
-		if resp.StatusCode != http.StatusOK {
-			resp.Body.Close()
-			break
-		}
-
-		doc, err := goquery.NewDocumentFromReader(resp.Body)
-
-		resp.Body.Close()
-
-		if err != nil {
-			break
-		}
-
-		newProducts := 0
-
-		doc.Find(".thumbnail-container").Each(func(i int, s *goquery.Selection) {
-
-			name := strings.TrimSpace(
-				s.Find(".product-title a").Text(),
-			)
-
-			if name == "" {
-				return
-			}
-
-			productURL, _ := s.Find(".product-title a").Attr("href")
-
-			if seen[productURL] {
-				return
-			}
-
-			seen[productURL] = true
-			newProducts++
-
-			image := s.Find(".product-thumbnail img").First()
-
-			imageURL := firstAttr(
-				image,
-				"data-full-size-image-url",
-				"data-src",
-				"data-original",
-				"src",
-			)
-
-			price := strings.TrimSpace(
-				s.Find(".price").First().Text(),
-			)
-
-			products = append(products, models.Product{
-				Name:  name,
-				Price: price,
-				Image: imageURL,
-				URL:   productURL,
-				Store: "TunisiaNet",
-			})
-		})
-
-		if newProducts == 0 {
-			break
-		}
-
-		page++
+	if resp.StatusCode != http.StatusOK {
+		return nil, false
 	}
 
-	return products
+	doc, err := goquery.NewDocumentFromReader(resp.Body)
+	if err != nil {
+		return nil, false
+	}
+
+	newProducts := 0
+
+	doc.Find(".thumbnail-container").Each(func(i int, s *goquery.Selection) {
+
+		name := strings.TrimSpace(
+			s.Find(".product-title a").Text(),
+		)
+
+		if name == "" {
+			return
+		}
+
+		productURL, _ := s.Find(".product-title a").Attr("href")
+
+		if seen[productURL] {
+			return
+		}
+
+		seen[productURL] = true
+		newProducts++
+
+		image := s.Find(".product-thumbnail img").First()
+
+		imageURL := firstAttr(
+			image,
+			"data-full-size-image-url",
+			"data-src",
+			"data-original",
+			"src",
+		)
+
+		price := strings.TrimSpace(
+			s.Find(".price").First().Text(),
+		)
+
+		products = append(products, models.Product{
+			Name:  name,
+			Price: price,
+			Image: imageURL,
+			URL:   productURL,
+			Store: "TunisiaNet",
+		})
+	})
+	if len(products) < 24 {
+		return products, false
+	}
+
+	return products, true
 }
 
 func GetProductDetails(productURL string) models.ProductDetails {

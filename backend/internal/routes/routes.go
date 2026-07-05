@@ -8,6 +8,7 @@ import (
 
 func RegisterRoutes(e *echo.Echo) {
 
-	e.GET("/products", handlers.GetProducts)
+	e.GET("/products/stream", handlers.StreamProducts)
+
 	e.GET("/product/details", handlers.GetProductDetails)
 }
