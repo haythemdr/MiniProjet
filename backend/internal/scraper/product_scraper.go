@@ -159,7 +159,7 @@ func SearchTunisianetPage(search string, page int) ([]models.Product, bool) {
 	var products []models.Product
 	seen := make(map[string]bool)
 
-	searchURL := "https://www.tunisianet.com.tnnn/recherche?controller=search&s=" +
+	searchURL := "https://www.tunisianet.com.tn/recherche?controller=search&s=" +
 		url.QueryEscape(search) +
 		"&submit_search=&page=" + strconv.Itoa(page) +
 		"&order=product.price.asc"

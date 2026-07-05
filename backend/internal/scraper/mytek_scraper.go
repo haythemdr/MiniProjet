@@ -34,7 +34,7 @@ func SearchMyTekPage(search string, page int) ([]models.Product, bool) {
 	var products []models.Product
 	seen := make(map[string]bool)
 
-	searchURL := "https://www.mytek.tnnn/myteksearch/index/productsearch/?q=" +
+	searchURL := "https://www.mytek.tn/myteksearch/index/productsearch/?q=" +
 		url.QueryEscape(search) +
 		"&p=" + strconv.Itoa(page)
 

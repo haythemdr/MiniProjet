@@ -16,7 +16,7 @@ func SearchWikiPage(search string, page int) ([]models.Product, bool) {
 	var products []models.Product
 	seen := make(map[string]bool)
 
-	searchURL := "https://wiki.tnnn/?s=" +
+	searchURL := "https://wiki.tn/?s=" +
 		url.QueryEscape(search) +
 		"&post_type=product&dgwt_wcas=1" +
 		"&paged=" + strconv.Itoa(page)
