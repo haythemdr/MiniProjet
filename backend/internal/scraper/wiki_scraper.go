@@ -13,7 +13,7 @@ import (
 
 func SearchWikiPage(search string, page int) ([]models.Product, bool) {
 
-	var products []models.Product
+	products := []models.Product{}
 	seen := make(map[string]bool)
 
 	searchURL := "https://wiki.tn/?s=" +

@@ -2,6 +2,13 @@ import { Product, ProductDetails } from "@/types/product";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080";
 
+export interface SearchResponse {
+  store: string;
+  source: string;
+  lastUpdated: string;
+  products: Product[];
+}
+
 async function fetchJson<T>(url: string): Promise<T> {
   const response = await fetch(url);
 
@@ -24,14 +31,17 @@ export async function searchProducts(search: string): Promise<Product[]> {
   return response.json();
 }
 
-export async function getProductDetails(url: string): Promise<ProductDetails> {
+export async function getProductDetails(
+  url: string
+): Promise<ProductDetails> {
   return fetchJson<ProductDetails>(
     `${API_URL}/product/details?url=${encodeURIComponent(url)}`
   );
 }
+
 export function streamProducts(
   search: string,
-  onProducts: (products: Product[]) => void,
+  onProducts: (response: SearchResponse) => void,
   onDone?: () => void,
   onError?: () => void
 ) {
@@ -40,8 +50,8 @@ export function streamProducts(
   );
 
   eventSource.onmessage = (event) => {
-    const products: Product[] = JSON.parse(event.data);
-    onProducts(products);
+    const response: SearchResponse = JSON.parse(event.data);
+    onProducts(response);
   };
 
   eventSource.addEventListener("done", () => {
@@ -55,4 +65,15 @@ export function streamProducts(
   };
 
   return eventSource;
+}
+export async function getSuggestions(query: string): Promise<string[]> {
+  const response = await fetch(
+    `${API_URL}/elastic/suggest?q=${encodeURIComponent(query)}`
+  );
+
+  if (!response.ok) {
+    throw new Error("Suggestion error");
+  }
+
+  return response.json();
 }

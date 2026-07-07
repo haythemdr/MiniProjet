@@ -31,7 +31,7 @@ func normalizeMyTekImageURL(value string) string {
 
 func SearchMyTekPage(search string, page int) ([]models.Product, bool) {
 
-	var products []models.Product
+	products := []models.Product{}
 	seen := make(map[string]bool)
 
 	searchURL := "https://www.mytek.tn/myteksearch/index/productsearch/?q=" +

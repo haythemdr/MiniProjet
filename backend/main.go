@@ -1,6 +1,7 @@
 package main
 
 import (
+	"tunisianet-scraper/internal/elasticsearch"
 	"tunisianet-scraper/internal/routes"
 	"tunisianet-scraper/internal/services"
 
@@ -19,6 +20,8 @@ func main() {
 	if err := database.CreateTables(); err != nil {
 		panic(err)
 	}
+	elasticsearch.Connect()
+	elasticsearch.CreateIndex()
 
 	// Start background cache refresher
 	services.StartCacheWarmer()

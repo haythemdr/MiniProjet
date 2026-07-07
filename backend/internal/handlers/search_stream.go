@@ -32,13 +32,13 @@ func StreamProducts(c echo.Context) error {
 		return echo.NewHTTPError(http.StatusInternalServerError, "Streaming unsupported")
 	}
 
-	channel := make(chan []models.Product)
-
+	channel := make(chan models.SearchResponse)
 	go services.SearchProductsStream(search, channel)
 
-	for products := range channel {
+	for response := range channel {
 
-		data, err := json.Marshal(products)
+		data, err := json.Marshal(response)
+
 		if err != nil {
 			continue
 		}
@@ -48,7 +48,7 @@ func StreamProducts(c echo.Context) error {
 		_, _ = res.Write([]byte("\n\n"))
 
 		flusher.Flush()
-	}
+	}	
 
 	_, _ = res.Write([]byte("event: done\n"))
 	_, _ = res.Write([]byte("data: finished\n\n"))

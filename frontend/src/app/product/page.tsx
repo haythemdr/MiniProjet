@@ -175,7 +175,7 @@ function ProductDetailsContent() {
                   <div className="absolute inset-0 flex items-center justify-center bg-zinc-50 rounded-xl z-10">
                     <div className="flex flex-col items-center gap-3">
                       <div className="w-12 h-12 border-4 border-zinc-200 border-t-violet-600 rounded-full animate-spin"></div>
-                      <span className="text-sm text-zinc-500 font-medium">Chargement de l'image...</span>
+                      <span className="text-sm text-zinc-500 font-medium">Chargement de l&apos;image...</span>
                     </div>
                   </div>
                 )}

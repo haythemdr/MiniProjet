@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"time"
 
 	"tunisianet-scraper/internal/database"
 	"tunisianet-scraper/internal/models"
@@ -196,4 +197,24 @@ func SaveProducts(query string, products []models.Product) error {
 	}
 
 	return tx.Commit(context.Background())
+}
+func GetLastUpdate(store string) (time.Time, error) {
+
+	var lastUpdate time.Time
+
+	err := database.DB.QueryRow(
+		context.Background(),
+		`
+		SELECT MAX(last_updated)
+		FROM products
+		WHERE store = $1
+		`,
+		store,
+	).Scan(&lastUpdate)
+
+	if err != nil {
+		return time.Time{}, err
+	}
+
+	return lastUpdate, nil
 }

@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import ProductCard from "@/components/ProductCard";
-import { searchProducts, streamProducts, } from "@/services/api";
+import { streamProducts, getSuggestions } from "@/services/api";
 import { Product } from "@/types/product";
 import {
   Search,
@@ -14,7 +14,6 @@ import {
   Sparkles,
   TrendingUp,
   ShoppingBag,
-  Zap,
   Star,
   ArrowRight,
   Grid3X3
@@ -65,9 +64,68 @@ const categoryIcons: Record<string, React.ReactNode> = {
   Électroménager: <Home className="w-5 h-5" />,
 };
 
+const normalizeProductValue = (value: string) =>
+  value.trim().toLowerCase().replace(/\s+/g, " ");
+
+const productDedupKey = (product: Product) => {
+  const identity = normalizeProductValue(product.name || product.url);
+  return `${normalizeProductValue(product.store)}|${identity}`;
+};
+
+const mergeProducts = (current: Product[], incoming: Product[]) => {
+  const productsByKey = new Map<string, Product>();
+
+  [...current, ...incoming].forEach((product) => {
+    productsByKey.set(productDedupKey(product), product);
+  });
+
+  return Array.from(productsByKey.values());
+};
+
+type SavedSession = {
+  search: string;
+  products: Product[];
+  page: number;
+};
+
+const getSavedSession = (): SavedSession => {
+  if (typeof window === "undefined") {
+    return { search: "", products: [], page: 1 };
+  }
+
+  const savedVersion = sessionStorage.getItem("productsCacheVersion");
+  if (savedVersion !== SESSION_CACHE_VERSION) {
+    sessionStorage.removeItem("search");
+    sessionStorage.removeItem("products");
+    sessionStorage.removeItem("page");
+    sessionStorage.setItem("productsCacheVersion", SESSION_CACHE_VERSION);
+    return { search: "", products: [], page: 1 };
+  }
+
+  const savedProducts = sessionStorage.getItem("products");
+  const savedPage = Number(sessionStorage.getItem("page") || "1");
+
+  return {
+    search: sessionStorage.getItem("search") || "",
+    products: savedProducts ? mergeProducts([], JSON.parse(savedProducts)) : [],
+    page: Number.isFinite(savedPage) && savedPage > 0 ? savedPage : 1,
+  };
+};
+
 export default function Homes() {
   const [search, setSearch] = useState("");
+  const [suggestions, setSuggestions] = useState<string[]>([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
   const [products, setProducts] = useState<Product[]>([]);
+  const [storesStatus, setStoresStatus] = useState<
+    Record<
+      string,
+      {
+        source: string;
+        lastUpdated: string;
+      }
+    >
+  >({});
   const [currentPage, setCurrentPage] = useState(1);
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
   const eventSourceRef = useRef<EventSource | null>(null);
@@ -80,41 +138,34 @@ export default function Homes() {
   const PRODUCTS_PER_PAGE = 24;
 
   useEffect(() => {
-    const savedVersion = sessionStorage.getItem("productsCacheVersion");
-    if (savedVersion !== SESSION_CACHE_VERSION) {
-      sessionStorage.removeItem("search");
-      sessionStorage.removeItem("products");
-      sessionStorage.removeItem("page");
-      sessionStorage.setItem("productsCacheVersion", SESSION_CACHE_VERSION);
+    const savedSession = getSavedSession();
+
+    if (
+      !savedSession.search &&
+      savedSession.products.length === 0 &&
+      savedSession.page === 1
+    ) {
       return;
     }
 
-    const savedSearch = sessionStorage.getItem("search");
-    const savedProducts = sessionStorage.getItem("products");
-    const savedPage = sessionStorage.getItem("page");
-
-    if (savedSearch) {
-      setSearch(savedSearch);
-    }
-
-    if (savedProducts) {
-      setProducts(JSON.parse(savedProducts));
-    }
-
-    if (savedPage) {
-      setCurrentPage(Number(savedPage));
-    }
+    /* eslint-disable react-hooks/set-state-in-effect */
+    setSearch(savedSession.search);
+    setProducts(savedSession.products);
+    setCurrentPage(savedSession.page);
+    /* eslint-enable react-hooks/set-state-in-effect */
   }, []);
+
   useEffect(() => {
-  return () => {
-    if (eventSourceRef.current) {
-      eventSourceRef.current.close();
-      eventSourceRef.current = null;
-    }
-  };
-}, []);
+    return () => {
+      if (eventSourceRef.current) {
+        eventSourceRef.current.close();
+        eventSourceRef.current = null;
+      }
+    };
+  }, []);
 
   const loadProducts = async (query: string, displayValue = query) => {
+    setShowSuggestions(false);
     const value = query.trim();
 
     if (!value) {
@@ -129,6 +180,7 @@ export default function Homes() {
 
     // Reset previous results
     setProducts([]);
+    setStoresStatus({});
     setCurrentPage(1);
 
     let firstBatch = true;
@@ -140,14 +192,23 @@ export default function Homes() {
       value,
 
       // Called every time a scraper sends a page
-      (newProducts) => {
+      (response) => {
+
         if (firstBatch) {
           setLoading(false);
           firstBatch = false;
         }
 
+        setStoresStatus((prev) => ({
+          ...prev,
+          [response.store]: {
+            source: response.source,
+            lastUpdated: response.lastUpdated,
+          },
+        }));
+
         setProducts((old) => {
-          const updated = [...old, ...newProducts];
+          const updated = mergeProducts(old, response.products);
 
           sessionStorage.setItem(
             "productsCacheVersion",
@@ -226,7 +287,7 @@ export default function Homes() {
     return pages;
   };
 
-  const Pagination = () => {
+  const renderPagination = () => {
     if (totalPages <= 1) return null;
 
     return (
@@ -329,14 +390,56 @@ export default function Homes() {
                   type="text"
                   placeholder="Recherchez un produit... (ex: smartphone, aspirateur, ordinateur)"
                   value={search}
-                  onChange={(event) => setSearch(event.target.value)}
-                  onKeyDown={(event) => {
+                  onChange={async (event) => {
+                    const value = event.target.value;
+
+                    setSearch(value);
+
+                    if (value.trim().length < 2) {
+                      setSuggestions([]);
+                      setShowSuggestions(false);
+                      return;
+                    }
+
+                    try {
+                      const data = await getSuggestions(value);
+
+                      setSuggestions(Array.isArray(data) ? data : []);
+                      setShowSuggestions(Array.isArray(data) && data.length > 0);
+                    } catch (err) {
+                      console.error(err);
+                    }
+                  }} onKeyDown={(event) => {
                     if (event.key === "Enter") {
                       loadProducts(search);
                     }
                   }}
                   className="w-full h-14 rounded-xl border-2 border-zinc-200 bg-zinc-50 pl-12 pr-4 text-sm outline-none transition-all placeholder:text-zinc-400 hover:border-zinc-300 focus:border-violet-500 focus:bg-white focus:ring-4 focus:ring-violet-500/10"
                 />
+                {showSuggestions &&
+                  Array.isArray(suggestions) &&
+                  suggestions.length > 0 && (
+                    <div className="absolute left-0 right-0 top-full z-50 mt-2 rounded-xl border border-zinc-200 bg-white shadow-xl overflow-hidden">
+
+                      {suggestions.map((item, index) => (
+
+                        <button
+                          key={index}
+                          onClick={() => {
+                            setSearch(item);
+                            setShowSuggestions(false);
+                            loadProducts(item);
+                          }}
+                          className="flex w-full items-center gap-3 px-4 py-3 text-left hover:bg-zinc-100 transition"
+                        >
+                          <Search className="w-4 h-4 text-zinc-400" />
+                          {item}
+                        </button>
+
+                      ))}
+
+                    </div>
+                  )}
               </div>
               <button
                 onClick={() => loadProducts(search)}
@@ -416,8 +519,38 @@ export default function Homes() {
           {/* Products Section */}
           <section>
             {/* Results Header */}
+            {Object.entries(storesStatus).length > 0 && (
+              <div className="mb-6 flex flex-wrap gap-3">
+                {Object.entries(storesStatus).map(([store, status]) => (
+                  <div
+                    key={store}
+                    className="flex items-center gap-3 rounded-xl border bg-white px-4 py-2 shadow-sm"
+                  >
+                    <span
+                      className={`h-3 w-3 rounded-full ${status.source === "live"
+                        ? "bg-green-500"
+                        : "bg-yellow-500"
+                        }`}
+                    />
+
+                    <div className="flex flex-col">
+                      <span className="font-semibold">{store}</span>
+
+                      <span className="text-xs text-zinc-500">
+                        {status.source === "live"
+                          ? "Live"
+                          : "Cached"}{" "}
+                        • {status.lastUpdated}
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
             <div className="mb-6 flex items-center justify-between">
+
               <div className="flex items-center gap-3">
+
                 <h2 className="text-2xl font-bold text-zinc-900">
                   {activeCategory || "Tous les produits"}
                 </h2>
@@ -426,6 +559,7 @@ export default function Homes() {
                     {products.length} résultat{products.length !== 1 ? 's' : ''}
                   </span>
                 )}
+
               </div>
               {products.length > 0 && (
                 <div className="hidden sm:flex items-center gap-2 text-sm text-zinc-500">
@@ -503,11 +637,11 @@ export default function Homes() {
             {/* Products Grid */}
             {products.length > 0 && (
               <>
-                <Pagination />
+                {renderPagination()}
                 <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-3">
                   {currentProducts.map((product, index) => (
                     <div
-                      key={product.url || product.name}
+                      key={productDedupKey(product)}
                       className="animate-fadeInUp"
                       style={{
                         animationDelay: `${index * 50}ms`,
@@ -518,7 +652,7 @@ export default function Homes() {
                     </div>
                   ))}
                 </div>
-                <Pagination />
+                {renderPagination()}
               </>
             )}
           </section>

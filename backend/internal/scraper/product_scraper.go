@@ -16,6 +16,22 @@ import (
 
 var httpClient = &http.Client{Timeout: 15 * time.Second}
 
+func newBrowserRequest(rawURL string, referer string) (*http.Request, error) {
+	req, err := http.NewRequest("GET", rawURL, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/138.0.0.0 Safari/537.36")
+	req.Header.Set("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8")
+	req.Header.Set("Accept-Language", "fr-FR,fr;q=0.9,en;q=0.8")
+	req.Header.Set("Cache-Control", "no-cache")
+	if referer != "" {
+		req.Header.Set("Referer", referer)
+	}
+
+	return req, nil
+}
 func firstAttr(selection *goquery.Selection, attrs ...string) string {
 	for _, attr := range attrs {
 		value, exists := selection.Attr(attr)
@@ -156,7 +172,7 @@ func productMatchesSearch(search string, values ...string) bool {
 }
 func SearchTunisianetPage(search string, page int) ([]models.Product, bool) {
 
-	var products []models.Product
+	products := []models.Product{}
 	seen := make(map[string]bool)
 
 	searchURL := "https://www.tunisianet.com.tn/recherche?controller=search&s=" +
@@ -164,7 +180,12 @@ func SearchTunisianetPage(search string, page int) ([]models.Product, bool) {
 		"&submit_search=&page=" + strconv.Itoa(page) +
 		"&order=product.price.asc"
 
-	resp, err := httpClient.Get(searchURL)
+	req, err := newBrowserRequest(searchURL, "https://www.tunisianet.com.tn/")
+	if err != nil {
+		return nil, false
+	}
+
+	resp, err := httpClient.Do(req)
 	if err != nil {
 		return nil, false
 	}
