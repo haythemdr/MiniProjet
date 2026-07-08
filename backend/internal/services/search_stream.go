@@ -2,6 +2,7 @@ package services
 
 import (
 	"log"
+	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -98,6 +99,23 @@ func streamStoreProducts(
 
 		products = filterDuplicates(products, seen)
 
+		var filtered []models.Product
+
+		for _, p := range products {
+
+			if ShouldKeepProduct(search, p) {
+				filtered = append(filtered, p)
+			}
+		}
+
+		products = filtered
+		for i := range products {
+			products[i].Score = CalculateScore(search, products[i])
+		}
+		sort.Slice(products, func(i, j int) bool {
+			return products[i].Score > products[j].Score
+		})
+
 		log.Printf(
 			"%s -> page=%d products=%d hasNext=%v",
 			store,
@@ -160,7 +178,7 @@ func SearchProductsStream(search string, out chan<- models.SearchResponse) {
 	_ = repository.RecordSearch(search)
 
 	var wg sync.WaitGroup
-	wg.Add(7)
+	wg.Add(10)
 
 	go func() {
 		defer wg.Done()
@@ -187,6 +205,18 @@ func SearchProductsStream(search string, out chan<- models.SearchResponse) {
 	go func() {
 		defer wg.Done()
 		streamStoreProducts(search, "Scoop", out, scraper.SearchScoopPage)
+	}()
+	go func() {
+		defer wg.Done()
+		streamStoreProducts(search, "Technopro", out, scraper.SearchTechnoproPage)
+	}()
+	go func() {
+		defer wg.Done()
+		streamStoreProducts(search, "Zoom", out, scraper.SearchZoomPage)
+	}()
+	go func() {
+		defer wg.Done()
+		streamStoreProducts(search, "TDiscount", out, scraper.SearchTDiscountPage)
 	}()
 	go func() {
 		defer wg.Done()

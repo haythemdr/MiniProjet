@@ -4,6 +4,7 @@ export interface Product {
   image: string;
   url: string;
   store: string;
+  score: number;
 }
 
 export interface ProductDetails {

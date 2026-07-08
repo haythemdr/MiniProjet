@@ -209,6 +209,7 @@ export default function Homes() {
 
         setProducts((old) => {
           const updated = mergeProducts(old, response.products);
+          updated.sort((a, b) => b.score - a.score);
 
           sessionStorage.setItem(
             "productsCacheVersion",
