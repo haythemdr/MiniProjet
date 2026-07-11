@@ -19,11 +19,16 @@ type searchResponse struct {
 func SearchProducts(query string) ([]models.Product, error) {
 
 	body := map[string]interface{}{
-		"size": 100,
+		"size":    10,
+		"_source": []string{"name"},
 		"query": map[string]interface{}{
 			"match": map[string]interface{}{
 				"name": map[string]interface{}{
-					"query": query,
+					"query":                query,
+					"fuzziness":            "AUTO",
+					"prefix_length":        1,
+					"max_expansions":       50,
+					"fuzzy_transpositions": true,
 				},
 			},
 		},

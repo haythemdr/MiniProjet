@@ -1,0 +1,22 @@
+{
+    "pc": "ordinateur",
+    "laptop": "ordinateur",
+    "notebook": "ordinateur",
+
+    "gsm": "telephone",
+    "mobile": "telephone",
+    "cellphone": "telephone",
+
+    "tv": "television",
+
+    "flashdisk": "cleusb",
+    "usbkey": "cleusb",
+
+    "earbuds": "ecouteur",
+
+    "frigo": "refrigerateur",
+    "fridge": "refrigerateur",
+
+    "monitor": "ecran",
+    "screen": "ecran"
+}
