@@ -1,7 +1,6 @@
 package services
 
 import (
-	"tunisianet-scraper/internal/elasticsearch"
 	"tunisianet-scraper/internal/models"
 	"tunisianet-scraper/internal/repository"
 )
@@ -16,13 +15,7 @@ func SaveAndIndexProducts(
 		return err
 	}
 
-	// Index into Elasticsearch
-	for _, product := range products {
-
-		if err := elasticsearch.IndexProduct(product); err != nil {
-			return err
-		}
-	}
+	// Elasticsearch disabled for deployment
 
 	return nil
 }
