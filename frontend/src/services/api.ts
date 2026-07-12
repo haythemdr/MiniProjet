@@ -65,7 +65,7 @@ export function streamProducts(
   };
 
   return eventSource;
-}
+}/*
 export async function getSuggestions(query: string): Promise<string[]> {
   const response = await fetch(
     `${API_URL}/elastic/suggest?q=${encodeURIComponent(query)}`
@@ -76,4 +76,7 @@ export async function getSuggestions(query: string): Promise<string[]> {
   }
 
   return response.json();
+}*/
+export async function getSuggestions(query: string): Promise<string[]> {
+  return [];
 }

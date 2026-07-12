@@ -12,8 +12,8 @@ func RegisterRoutes(e *echo.Echo) {
 
 	e.GET("/product/details", handlers.GetProductDetails)
 
-	e.GET("/elastic/search", handlers.ElasticSearch)
+	//	e.GET("/elastic/search", handlers.ElasticSearch)
 
-	e.GET("/elastic/suggest", handlers.SuggestProducts)
+	//e.GET("/elastic/suggest", handlers.SuggestProducts)
 
 }

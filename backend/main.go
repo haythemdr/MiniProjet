@@ -1,8 +1,6 @@
 package main
 
 import (
-	"log"
-	"tunisianet-scraper/internal/elasticsearch"
 	"tunisianet-scraper/internal/routes"
 	"tunisianet-scraper/internal/services"
 
@@ -20,12 +18,6 @@ func main() {
 
 	if err := database.CreateTables(); err != nil {
 		panic(err)
-	}
-	if os.Getenv("ELASTICSEARCH_URL") != "" {
-		elasticsearch.Connect()
-		elasticsearch.CreateIndex()
-	} else {
-		log.Println("⚠️ Elasticsearch disabled")
 	}
 	//elasticsearch.Connect()
 	//elasticsearch.CreateIndex()
