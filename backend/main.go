@@ -21,9 +21,9 @@ func main() {
 		panic(err)
 	}
 	elasticsearch.Connect()
-	elasticsearch.CreateIndex()
+	//elasticsearch.CreateIndex()
 	services.LoadSynonyms("internal/config/synonyms.json")
-		// Start background cache refresher
+	// Start background cache refresher
 	services.StartCacheWarmer()
 
 	e := echo.New()
